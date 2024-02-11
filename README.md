@@ -2,11 +2,11 @@
 OpenRouter Telegram Bot 🤖
 
 ## Extended Description
-The OpenRouter Telegram Bot offers a seamless bridge 🌉 between Telegram users and the vast capabilities of various AI models hosted by OpenRouter. This bot simplifies the interaction with AI technologies and provides a customizable platform for a wide audience.
+The OpenRouter Telegram Bot offers a seamless bridge 🌉 between Telegram users and the vast capabilities of various 75 AI models hosted by OpenRouter (https://openrouter.ai/). This bot simplifies the interaction with AI technologies and provides a customizable platform for a wide audience.
 
 ### 🌟 Detailed Features
 
-- 🔑 **User Authentication**: Securely authenticate with a unique API key from OpenRouter for access to AI models.
+- 🔑 **User Authentication**: Securely authenticate with a unique API key from OpenRouter (https://openrouter.ai/) for access to 75 AI models.
 
 - 🤖 **AI Model Interaction**: Choose from a range of AI models, each offering unique capabilities from language understanding to complex problem-solving.
 
@@ -17,8 +17,9 @@ The OpenRouter Telegram Bot offers a seamless bridge 🌉 between Telegram users
 ### 🚀 Getting Started: Step-by-Step Guide
 
 1. **Repository Setup**: Clone the GitHub repository to your local setup.
-2. **Dependency Installation**: Run `pip install -r requirements.txt` for all necessary packages.
-3. **Bot Activation**: Start the bot with `python main.py`, connecting it to Telegram and OpenRouter.
+2. **Configure `config.py`**: Update the `config.py` file with your Telegram API key to ensure the bot can connect to the Telegram API successfully.
+3. **Dependency Installation**: Run `pip install -r requirements.txt` for all necessary packages.
+4. **Bot Activation**: Start the bot with `python main.py`, connecting it to Telegram and OpenRouter.
 
 ### 📝 Interactive Bot Commands
 
