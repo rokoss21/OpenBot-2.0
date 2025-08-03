@@ -2,7 +2,7 @@
 OpenRouter Telegram Bot 🤖
 
 ## Extended Description
-The OpenRouter Telegram Bot offers a seamless bridge 🌉 between Telegram users and the vast capabilities of various 75 AI models hosted by OpenRouter (https://openrouter.ai/). This bot simplifies the interaction with AI technologies and provides a customizable platform for a wide audience.
+The OpenRouter Telegram Bot offers a seamless bridge 🌉 between Telegram users and the vast capabilities of various AI models hosted by OpenRouter (https://openrouter.ai/). The bot automatically retrieves the current list of available models from the OpenRouter API, simplifying interaction with the most recent options.
 
 ### 🌟 Detailed Features
 

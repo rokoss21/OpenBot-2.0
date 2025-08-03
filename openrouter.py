@@ -4,6 +4,8 @@ import logging
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+MODELS_URL = "https://openrouter.ai/api/v1/models"
+
 def send_to_openrouter(message, api_key, model_id, max_tokens=4096, message_history=None):
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -34,3 +36,21 @@ def send_to_openrouter(message, api_key, model_id, max_tokens=4096, message_hist
     except requests.exceptions.RequestException as e:
         logging.error(f"Error communicating with OpenRouter API: {e}")
         return "Извините, не удалось связаться с OpenRouter API."
+
+
+def fetch_available_models():
+    """Fetch list of models from OpenRouter."""
+    try:
+        response = requests.get(MODELS_URL, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        models = {}
+        for idx, item in enumerate(data.get("data", []), start=1):
+            name = item.get("id")
+            max_tokens = item.get("top_provider", {}).get("max_completion_tokens", 4096)
+            if name:
+                models[idx] = {"name": name, "max_tokens": max_tokens}
+        return models
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching models list: {e}")
+        return None

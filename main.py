@@ -12,7 +12,7 @@ from log_config import setup_logging
 # Импортируйте SessionLocal для создания сессий и Session для аннотации
 from db import (get_user_by_telegram_id, create_or_update_user, update_user_api_key, update_user_model,
                 add_message, get_user_messages, delete_user_messages, SessionLocal)
-from openrouter import send_to_openrouter
+from openrouter import send_to_openrouter, fetch_available_models
 from models import User
 from sqlalchemy.orm import Session  # Только для аннотации типов
 
@@ -136,9 +136,12 @@ def model(update: Update, context: CallbackContext) -> None:
         if db_user and db_user.model_id:
             current_model_info = f"Текущая модель: {db_user.model_id}, токены: {db_user.max_tokens if db_user.max_tokens else 'не указано'}."
             update.message.reply_text(current_model_info)
-            
+
+        models = fetch_available_models() or AVAILABLE_MODELS
+        context.user_data['available_models'] = models
+
         message = "Выберите модель, отправив её номер:\n\n"
-        for key, value in AVAILABLE_MODELS.items():
+        for key, value in models.items():
             message += f"{key}: {value['name']}\n"
         update.message.reply_text(message)
         context.user_data['awaiting_model_choice'] = True
@@ -167,8 +170,9 @@ def handle_message(update: Update, context: CallbackContext) -> None:
         if 'awaiting_model_choice' in context.user_data and context.user_data['awaiting_model_choice']:
             try:
                 choice = int(update.message.text)
-                if choice in AVAILABLE_MODELS:
-                    chosen_model = AVAILABLE_MODELS[choice]
+                models = context.user_data.get('available_models', AVAILABLE_MODELS)
+                if choice in models:
+                    chosen_model = models[choice]
                     # Убедитесь, что функция update_user_model принимает сессию как аргумент
                     update_user_model(user_id, chosen_model['name'], chosen_model.get('max_tokens', 1024), session)
                     update.message.reply_text(f"Модель успешно изменена на {chosen_model['name']} с максимальным количеством токенов {chosen_model.get('max_tokens', 1024)}.")
