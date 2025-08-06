@@ -88,8 +88,8 @@ User ↔ Bot API ↔  │  HTTP  |  OpenRouter Gateway |
 
 ```bash
 # 1 – Clone the repo
-git clone https://github.com/<your‑org>/openbot.git
-cd openbot
+git clone https://github.com/rokoss21/OpenBot-2.0.git
+cd OpenBot-2.0
 
 # 2 – Create virtual env
 python -m venv .venv
