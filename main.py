@@ -1,13 +1,15 @@
 #main.py
 # Необходимые импорты
+import asyncio
 import logging
-import requests
 import time
-import json
 from datetime import datetime
+from typing import Optional, Tuple
+
+import httpx
 from telegram import Update, ChatAction
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-from config import TELEGRAM_BOT_TOKEN, AVAILABLE_MODELS
+from config import TELEGRAM_BOT_TOKEN, AVAILABLE_MODELS, API_VALIDATE_URL
 from log_config import setup_logging
 # Импортируйте SessionLocal для создания сессий и Session для аннотации
 from db import (get_user_by_telegram_id, create_or_update_user, update_user_api_key, update_user_model,
@@ -36,41 +38,61 @@ def start(update: Update, context: CallbackContext) -> None:
     """
     update.message.reply_text(welcome_message)
 
-def validate_api_key(api_key: str, user_id: int, session: Session) -> bool:
+async def _validate_api_key_request(api_key: str) -> httpx.Response:
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
     }
-    # Определите структуру данных в соответствии с требованиями вашего API
-    data = {
-        "model": "openai/gpt-3.5-turbo",  # Используйте модель по умолчанию для проверки
-        "messages": [{"role": "user", "content": "Hello"}]  # Простой запрос для проверки ключа
-    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        return await client.get(API_VALIDATE_URL, headers=headers)
+
+
+def _update_user_validity(session: Session, user_id: int, is_valid: bool) -> None:
+    user = session.query(User).filter(User.telegram_id == user_id).first()
+    if user:
+        user.is_valid = is_valid
+        session.commit()
+
+
+async def validate_api_key_async(api_key: str, user_id: int, session: Session) -> Tuple[bool, Optional[str]]:
+    is_valid = False
+    error_message: Optional[str] = None
 
     try:
-        # Отправляем запрос на API для проверки ключа
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
-        
-        # Проверяем успешный статус код, обычно 200 для успешной проверки
-        is_valid = response.status_code == 200
-
-        # Обновляем статус валидности API ключа в базе данных для пользователя
-        user = session.query(User).filter(User.telegram_id == user_id).first()
-        if user:
-            user.is_valid = is_valid
-            session.commit()
-
-        if is_valid:
+        response = await _validate_api_key_request(api_key)
+    except httpx.HTTPError as exc:
+        logger.error(f"Error validating API key for user {user_id}: {exc}")
+        error_message = "Не удалось проверить API ключ. Попробуйте позже."
+    except Exception as exc:
+        logger.error(f"Unexpected error validating API key for user {user_id}: {exc}")
+        error_message = "Не удалось проверить API ключ. Попробуйте позже."
+    else:
+        if response.status_code == 200:
+            is_valid = True
             logger.info(f"API key for user {user_id} is valid.")
+        elif response.status_code in (401, 403):
+            error_message = "API ключ недействителен. Пожалуйста, введите другой ключ командой /api."
+            logger.warning(
+                f"API key validation failed for user {user_id} with status code {response.status_code}: {response.text}"
+            )
         else:
-            logger.info(f"API key validation failed for user {user_id} with status code {response.status_code}: {response.text}")
+            error_message = (
+                "Не удалось проверить API ключ. Код ответа: "
+                f"{response.status_code}. Попробуйте позже."
+            )
+            logger.error(
+                f"API key validation for user {user_id} returned unexpected status {response.status_code}: {response.text}"
+            )
 
-        return is_valid
-    except Exception as e:
-        logger.error(f"Error validating API key for user {user_id}: {e}")
-        return False
+    _update_user_validity(session, user_id, is_valid)
+
+    if is_valid:
+        return True, None
+
+    return False, error_message or "Не удалось проверить API ключ. Попробуйте позже."
 
 
+def validate_api_key(api_key: str, user_id: int, session: Session) -> Tuple[bool, Optional[str]]:
+    return asyncio.run(validate_api_key_async(api_key, user_id, session))
 
 def api(update: Update, context: CallbackContext) -> None:
     send_typing_action(update.message.chat_id, context)
@@ -82,14 +104,16 @@ def api(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     # Используем SessionLocal для создания новой сессии
     with SessionLocal() as session:
-        if validate_api_key(api_key, user_id, session):
+        is_valid, error_message = validate_api_key(api_key, user_id, session)
+        if is_valid:
             # Обновляем или создаем пользователя с новым ключом внутри сессии
             user = create_or_update_user(user_id, api_key, session)
             # Дополнительная логика с пользователем, если нужно
             context.user_data['api_key_valid'] = True
             update.message.reply_text('API ключ действителен. Теперь вы можете выбрать модель командой /model.')
         else:
-            update.message.reply_text('API ключ недействителен. Пожалуйста, введите другой ключ командой /api.')
+            context.user_data['api_key_valid'] = False
+            update.message.reply_text(error_message)
         # Сессия автоматически закроется после выхода из блока with
 
 
