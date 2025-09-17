@@ -12,17 +12,16 @@ def get_user_by_telegram_id(telegram_id: int, session: BaseSession):
 def create_or_update_user(telegram_id: int, api_key: str, session: BaseSession):
     user = get_user_by_telegram_id(telegram_id, session)
     if user is None:
-        user = User(telegram_id=telegram_id, api_key=api_key)
+        user = User(telegram_id=telegram_id)
         session.add(user)
-    else:
-        user.api_key = api_key
+    user.set_api_key(api_key)
     session.commit()
     return user
 
 def update_user_api_key(telegram_id: int, api_key: str, session: BaseSession):
     user = get_user_by_telegram_id(telegram_id, session)
     if user:
-        user.api_key = api_key
+        user.set_api_key(api_key)
         session.commit()
 
 def update_user_model(telegram_id: int, model_id: str, max_tokens: int, session: BaseSession):

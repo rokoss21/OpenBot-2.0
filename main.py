@@ -12,6 +12,7 @@ from log_config import setup_logging
 # Импортируйте SessionLocal для создания сессий и Session для аннотации
 from db import (get_user_by_telegram_id, create_or_update_user, update_user_api_key, update_user_model,
                 add_message, get_user_messages, delete_user_messages, SessionLocal)
+from encryption import DecryptionError, EncryptionKeyMissingError
 from openrouter import send_to_openrouter
 from models import User
 from sqlalchemy.orm import Session  # Только для аннотации типов
@@ -101,7 +102,21 @@ def restricted_access(func):
         user_id = update.effective_user.id
         with SessionLocal() as session:  # Используйте context manager для создания сессии
             db_user = get_user_by_telegram_id(user_id, session)  # Передайте сессию как аргумент
-            if db_user and db_user.api_key and db_user.is_valid:
+            decrypted_key = None
+            if db_user:
+                try:
+                    decrypted_key = db_user.api_key
+                except DecryptionError:
+                    logger.error("Не удалось расшифровать API ключ пользователя %s", user_id, exc_info=True)
+                    db_user.is_valid = False
+                    session.commit()
+                    update.message.reply_text('Не удалось расшифровать API ключ. Пожалуйста, обновите его командой /api.')
+                    return
+                except EncryptionKeyMissingError:
+                    logger.error("Не настроен ключ шифрования для пользователя %s", user_id, exc_info=True)
+                    update.message.reply_text('Сервер не настроен для расшифровки API ключа. Обратитесь к администратору.')
+                    return
+            if db_user and decrypted_key and db_user.is_valid:
                 return func(update, context, *args, **kwargs)
             else:
                 update.message.reply_text('Пожалуйста, введите действующий API ключ командой /api.')
@@ -178,9 +193,24 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             except ValueError:
                 update.message.reply_text("Пожалуйста, введите номер модели из списка, предоставленного командой /model.")
         else:
-            if db_user and db_user.api_key and db_user.model_id:
+            decrypted_key = None
+            if db_user:
+                try:
+                    decrypted_key = db_user.api_key
+                except DecryptionError:
+                    logger.error("Не удалось расшифровать API ключ пользователя %s", user_id, exc_info=True)
+                    db_user.is_valid = False
+                    session.commit()
+                    update.message.reply_text('Не удалось расшифровать API ключ. Пожалуйста, обновите его командой /api.')
+                    return
+                except EncryptionKeyMissingError:
+                    logger.error("Не настроен ключ шифрования для пользователя %s", user_id, exc_info=True)
+                    update.message.reply_text('Сервер не настроен для расшифровки API ключа. Обратитесь к администратору.')
+                    return
+
+            if db_user and decrypted_key and db_user.model_id:
                 message_history = [msg.text for msg in get_user_messages(user_id, session)]  # Передаем сессию как аргумент
-                response_message = send_to_openrouter(update.message.text, db_user.api_key, db_user.model_id, max_tokens=db_user.max_tokens, message_history=message_history)
+                response_message = send_to_openrouter(update.message.text, decrypted_key, db_user.model_id, max_tokens=db_user.max_tokens, message_history=message_history)
                 add_message(user_id, update.message.text, datetime.now(), 'in', session)  # Передаем сессию как аргумент
                 add_message(user_id, response_message, datetime.now(), 'out', session)  # Передаем сессию как аргумент
                 update.message.reply_text(response_message)
