@@ -179,8 +179,26 @@ def handle_message(update: Update, context: CallbackContext) -> None:
                 update.message.reply_text("Пожалуйста, введите номер модели из списка, предоставленного командой /model.")
         else:
             if db_user and db_user.api_key and db_user.model_id:
-                message_history = [msg.text for msg in get_user_messages(user_id, session)]  # Передаем сессию как аргумент
-                response_message = send_to_openrouter(update.message.text, db_user.api_key, db_user.model_id, max_tokens=db_user.max_tokens, message_history=message_history)
+                stored_messages = sorted(
+                    get_user_messages(user_id, session),  # Передаем сессию как аргумент
+                    key=lambda message: message.id
+                )
+                role_mapping = {'in': 'user', 'out': 'assistant'}
+                message_history = [
+                    {
+                        "role": role_mapping.get(stored_message.direction, 'assistant'),
+                        "content": stored_message.text
+                    }
+                    for stored_message in stored_messages
+                ]
+
+                response_message = send_to_openrouter(
+                    update.message.text,
+                    db_user.api_key,
+                    db_user.model_id,
+                    max_tokens=db_user.max_tokens,
+                    message_history=message_history
+                )
                 add_message(user_id, update.message.text, datetime.now(), 'in', session)  # Передаем сессию как аргумент
                 add_message(user_id, response_message, datetime.now(), 'out', session)  # Передаем сессию как аргумент
                 update.message.reply_text(response_message)
