@@ -9,11 +9,8 @@ def send_to_openrouter(message, api_key, model_id, max_tokens=4096, message_hist
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    messages_payload = [{"role": "user", "content": message}]
-    # Добавляем историю сообщений в payload, если она передана
-    if message_history:
-        history_payload = [{"role": "system", "content": msg} for msg in message_history]
-        messages_payload = history_payload + messages_payload
+    messages_payload = list(message_history) if message_history else []
+    messages_payload.append({"role": "user", "content": message})
 
     payload = {
         "model": model_id,
